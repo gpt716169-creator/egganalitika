@@ -5,65 +5,78 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Яйцо Хорошее</title>
     
-    <!-- Подключение Tailwind CSS -->
+    <!-- Стили Tailwind -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Подключение React и ReactDOM -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" referrerpolicy="no-referrer"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" referrerpolicy="no-referrer"></script>
+    <!-- React и ReactDOM (через надежный cdnjs) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" crossorigin></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" crossorigin></script>
     
-    <!-- Подключение Babel -->
+    <!-- Babel для запуска JSX -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
     
-    <!-- Подключение Telegram WebApp Script -->
+    <!-- Telegram WebApp -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
-    <!-- ИСПРАВЛЕНИЕ 1: Подключение ванильного Lucide (не React версии) -->
-    <script src="https://unpkg.com/lucide@0.263.1/dist/umd/lucide.min.js"></script>
+    <!-- Иконки Lucide (Vanila JS версия через jsdelivr) -->
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.1/dist/umd/lucide.min.js"></script>
 
     <style>
         body { 
             background-color: #0F1115; 
             -webkit-tap-highlight-color: transparent;
             color: #ffffff;
-            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
         
         /* Скрываем скроллбар */
-        ::-webkit-scrollbar {
-            width: 0px;
-            background: transparent;
-        }
+        ::-webkit-scrollbar { width: 0px; background: transparent; }
 
-        /* ИСПРАВЛЕНИЕ 3: Кастомные анимации (так как плагины Tailwind не работают в CDN) */
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-        
-        @keyframes slideInRight {
-            from { transform: translateX(20px); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
+        /* Анимации */
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideInRight { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
-        .animate-fade-in {
-            animation: fadeIn 0.5s ease-out;
-        }
+        .animate-fade-in { animation: fadeIn 0.5s ease-out; }
+        .animate-slide-in { animation: slideInRight 0.3s ease-out; }
         
-        .animate-slide-in {
-            animation: slideInRight 0.3s ease-out;
+        /* Блок для отображения ошибок (скрыт по умолчанию) */
+        #error-logger {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; color: #ff5555;
+            z-index: 9999; padding: 20px;
+            font-family: monospace; font-size: 12px;
+            overflow: auto; white-space: pre-wrap;
         }
     </style>
 </head>
 <body>
+    <!-- Контейнер для приложения -->
     <div id="root"></div>
+    
+    <!-- Логгер ошибок для отладки в Telegram -->
+    <div id="error-logger"></div>
+
+    <script>
+        // Глобальный перехватчик ошибок для Telegram
+        window.onerror = function(message, source, lineno, colno, error) {
+            const logger = document.getElementById('error-logger');
+            logger.style.display = 'block';
+            logger.innerHTML += `❌ ОШИБКА:\n${message}\nСтрока: ${lineno}\n\n`;
+        };
+        
+        // Инициализация Telegram
+        if (window.Telegram && window.Telegram.WebApp) {
+            window.Telegram.WebApp.ready();
+            window.Telegram.WebApp.expand(); // Развернуть на весь экран
+        }
+    </script>
 
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // ИСПРАВЛЕНИЕ 1: Компонент-обертка для иконок
-        // Мы используем useEffect без зависимостей в самом App, чтобы обновлять иконки,
-        // но здесь ставим тег <i>, который ищет lucide.createIcons()
+        // Компонент иконки
         const Icon = ({ name, size = 16, className = "" }) => (
             <i data-lucide={name} className={className} style={{ width: size, height: size, display: 'inline-block' }}></i>
         );
@@ -312,7 +325,6 @@
 
             // Helper to show notification
             const showNotification = (msg, type = 'success') => {
-                // ИСПРАВЛЕНИЕ 5: Проверка на Telegram WebApp
                 if (window.Telegram?.WebApp?.showPopup) {
                     window.Telegram.WebApp.showPopup({
                         title: type === 'success' ? 'Готово' : 'Информация',
@@ -320,7 +332,6 @@
                         buttons: [{ type: 'ok' }]
                     });
                 } else {
-                    // Fallback to custom toast
                     setToast({ message: msg, type });
                     setTimeout(() => setToast({ message: null, type: 'info' }), 3000);
                 }
@@ -740,7 +751,7 @@
             );
 
             return (
-                <div className="min-h-screen text-gray-100 font-sans selection:bg-yellow-500/30 pb- safe-area-bottom">
+                <div className="min-h-screen text-gray-100 font-sans selection:bg-yellow-500/30 pb-[env(safe-area-inset-bottom)]">
                     <Toast message={toast.message} type={toast.type} />
                     
                     <div className="max-w-md mx-auto p-4">
@@ -760,7 +771,7 @@
 
                         {/* Bottom Navigation */}
                         {viewMode === 'main' && (
-                            <div className="fixed bottom-0 left-0 right-0 bg-[#0F1115]/90 backdrop-blur-xl border-t border-gray-800 p-2 z-50 safe-area-bottom">
+                            <div className="fixed bottom-0 left-0 right-0 bg-[#0F1115]/90 backdrop-blur-xl border-t border-gray-800 p-2 z-50 pb-[env(safe-area-inset-bottom)]">
                                 <div className="max-w-md mx-auto grid grid-cols-3 gap-1">
                                     <button onClick={() => setActiveTab('dashboard')} className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all duration-300 ${activeTab === 'dashboard' ? 'text-yellow-400 bg-yellow-400/10' : 'text-gray-500 hover:text-gray-300'}`}>
                                         <Icon name="layers" size={20} />
