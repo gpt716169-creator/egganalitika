@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Яйцо Хорошее</title>
+    
+    <!-- Подключение Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Подключение React и ReactDOM -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" referrerpolicy="no-referrer"></script>
+    
+    <!-- Подключение Babel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    
+    <!-- Подключение Telegram WebApp Script -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <!-- ИСПРАВЛЕНИЕ 1: Подключение ванильного Lucide (не React версии) -->
+    <script src="https://unpkg.com/lucide@0.263.1/dist/umd/lucide.min.js"></script>
+
+    <style>
+        body { 
+            background-color: #0F1115; 
+            -webkit-tap-highlight-color: transparent;
+            color: #ffffff;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        
+        /* Скрываем скроллбар */
+        ::-webkit-scrollbar {
+            width: 0px;
+            background: transparent;
+        }
+
+        /* ИСПРАВЛЕНИЕ 3: Кастомные анимации (так как плагины Tailwind не работают в CDN) */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes slideInRight {
+            from { transform: translateX(20px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+        
+        .animate-slide-in {
+            animation: slideInRight 0.3s ease-out;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // ИСПРАВЛЕНИЕ 1: Компонент-обертка для иконок
+        // Мы используем useEffect без зависимостей в самом App, чтобы обновлять иконки,
+        // но здесь ставим тег <i>, который ищет lucide.createIcons()
+        const Icon = ({ name, size = 16, className = "" }) => (
+            <i data-lucide={name} className={className} style={{ width: size, height: size, display: 'inline-block' }}></i>
+        );
+
+        // --- Mock Data ---
+        const MOCK_DATA = {
+            summary: {
+                netIncome: 450000,
+                revenue: 1200000,
+                soldThisMonth: 108500,
+                eggBalance: 12500,
+                forecastDemand: 14200,
+                forecastExplanation: "База прошлого года (12,100) + Сезонный рост (2,100)",
+                avgCost: 8.5,
+                avgPrice: 11.2,
+            },
+            forecastDetails: [
+                { name: 'Сеть "У дома"', amount: 5500, change: '+10%', reason: 'Плановая акция' },
+                { name: 'Пекарня "Хлеб"', amount: 4200, change: '+5%', reason: 'Сезон выпечки' },
+                { name: 'Кондитерская №1', amount: 3000, change: '0%', reason: 'Стандартный объем' },
+                { name: 'ИП Петров', amount: 1000, change: '-2%', reason: 'Снижение спроса' },
+                { name: 'Розница (Мелкие)', amount: 500, change: '0%', reason: 'Прогноз по статистике' },
+            ],
+            trends: {
+                income: +12, 
+                revenue: +5,
+                sold: +8,
+                churn: -2,
+            },
+            shipments: {
+                today: [
+                    { id: 1, name: 'Пекарня "Хлеб"', amount: 3600, status: 'pending' },
+                    { id: 2, name: 'ИП Иванов (Магазин)', amount: 1200, status: 'ready' },
+                    { id: 3, name: 'Сеть "У дома"', amount: 5000, status: 'shipped' },
+                ],
+                tomorrow: {
+                    totalAmount: 10500,
+                    shipmentsCount: 5,
+                    details: [
+                        { name: 'Сеть "У дома"', amount: 4500, address: 'ул. Ленина, 45', defaultPrice: 11.50 },
+                        { name: 'Пекарня "Хлеб"', amount: 2500, address: 'пр. Мира, 12', defaultPrice: 11.00 },
+                        { name: 'Столовая №5', amount: 1500, address: 'ул. Заводская, 8', defaultPrice: 10.80 },
+                        { name: 'Магазин "Продукты"', amount: 1200, address: 'ул. Кирова, 10', defaultPrice: 12.00 },
+                        { name: 'ИП Сидоров', amount: 800, address: 'Рынок "Центральный"', defaultPrice: 12.50 },
+                    ]
+                }
+            },
+            clients: {
+                total: 45,
+                active: 42,
+                churned: 3,
+                atRisk: [
+                    {
+                        id: 101,
+                        name: 'Магазин "Продукты"',
+                        lastOrderDays: 5,
+                        volume: 45000,
+                        eggs: 4000,
+                        trend: 'down',
+                        recommendation: 'Предложить скидку 5% на партию',
+                        joinDate: '15.02.2023',
+                        totalOrders: 32,
+                        totalEggsAllTime: 120000,
+                        totalRevenueAllTime: 1200000,
+                        totalProfitAllTime: 200000
+                    },
+                    {
+                        id: 102,
+                        name: 'Кафе "Утро"',
+                        lastOrderDays: 8,
+                        volume: 25000,
+                        eggs: 2100,
+                        trend: 'down',
+                        recommendation: 'Позвонить, узнать причину паузы',
+                        joinDate: '20.08.2023',
+                        totalOrders: 15,
+                        totalEggsAllTime: 45000,
+                        totalRevenueAllTime: 400000,
+                        totalProfitAllTime: 80000
+                    }
+                ],
+                top: [
+                    { 
+                        id: 1,
+                        name: 'Сеть "У дома"', 
+                        volume: 250000, 
+                        eggs: 22500, 
+                        trend: 'up',
+                        joinDate: '12.03.2023',
+                        totalOrders: 145,
+                        totalEggsAllTime: 450000,
+                        totalRevenueAllTime: 5200000,
+                        totalProfitAllTime: 1200000
+                    },
+                    { 
+                        id: 2,
+                        name: 'Пекарня "Хлеб"', 
+                        volume: 180000, 
+                        eggs: 16200, 
+                        trend: 'stable',
+                        joinDate: '10.06.2023',
+                        totalOrders: 98,
+                        totalEggsAllTime: 310000,
+                        totalRevenueAllTime: 3400000,
+                        totalProfitAllTime: 850000
+                    },
+                    { 
+                        id: 3,
+                        name: 'Кондитерская №1', 
+                        volume: 150000, 
+                        eggs: 13500, 
+                        trend: 'up',
+                        joinDate: '01.09.2023',
+                        totalOrders: 45,
+                        totalEggsAllTime: 120000,
+                        totalRevenueAllTime: 1400000,
+                        totalProfitAllTime: 320000
+                    },
+                    { 
+                        id: 4,
+                        name: 'ИП Петров', 
+                        volume: 95000, 
+                        eggs: 8500, 
+                        trend: 'down',
+                        joinDate: '15.01.2024',
+                        totalOrders: 20,
+                        totalEggsAllTime: 45000,
+                        totalRevenueAllTime: 480000,
+                        totalProfitAllTime: 95000
+                    },
+                ],
+                retention: 94
+            },
+            aiRecommendations: [
+                "Клиент 'Магазин Продукты' не заказывал 4 дня. Риск оттока.",
+                "На пятницу прогнозируется всплеск спроса (+20%).",
+                "Средний чек вырос на 5%."
+            ],
+        };
+
+        // --- UI Components ---
+
+        const Card = ({ children, className = "", onClick }) => (
+            <div 
+                onClick={onClick}
+                className={`bg-gray-800 rounded-2xl p-4 transition-all duration-200 border border-gray-700/50 ${onClick ? 'active:scale-95 cursor-pointer hover:bg-gray-700' : ''} ${className}`}
+            >
+                {children}
+            </div>
+        );
+
+        const TrendIcon = ({ value, invert = false }) => {
+            const isPositive = value > 0;
+            const isGood = invert ? !isPositive : isPositive;
+            
+            return (
+                <div className={`flex items-center text-xs font-bold ${isGood ? 'text-green-400' : 'text-red-400'}`}>
+                    <Icon name={isPositive ? "trending-up" : "trending-down"} size={14} className="mr-1" />
+                    {Math.abs(value)}%
+                </div>
+            );
+        };
+
+        const ValueDisplay = ({ value, label, subValue, prefix = "", suffix = "" }) => (
+            <div className="flex flex-col h-full justify-between">
+                <span className="text-gray-400 text-[10px] font-bold uppercase tracking-wider">{label}</span>
+                <div className="mt-1">
+                    <div className="text-xl font-bold text-white tracking-tight">
+                        {prefix}{value.toLocaleString()}{suffix}
+                    </div>
+                    {subValue && <div className="mt-1">{subValue}</div>}
+                </div>
+            </div>
+        );
+
+        const Header = ({ title, subtitle, onBack }) => (
+            <div className="flex items-center gap-3 mb-6 pt-2">
+                {onBack && (
+                    <button 
+                        onClick={onBack}
+                        className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center text-gray-400 active:bg-gray-700 hover:text-white transition-colors"
+                    >
+                        <Icon name="chevron-left" size={20} />
+                    </button>
+                )}
+                <div className="flex-1">
+                    <h1 className="text-2xl font-black text-white tracking-tight leading-none">{title}</h1>
+                    {subtitle && <p className="text-gray-400 text-xs font-medium mt-1">{subtitle}</p>}
+                </div>
+                {!onBack && (
+                    <div className="bg-gray-800 border border-gray-700 p-2 rounded-full shadow-lg">
+                        <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center text-white font-bold shadow-inner">
+                            К
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+
+        const SectionTitle = ({ title, iconName, colorClass = "text-yellow-500" }) => (
+            <div className="flex items-center gap-2 mb-3 mt-6 px-1">
+                {iconName && <Icon name={iconName} size={18} className={colorClass} />}
+                <h2 className="text-lg font-bold text-gray-200">{title}</h2>
+            </div>
+        );
+
+        // Toast Component for Notifications
+        const Toast = ({ message, type, onClose }) => {
+            if (!message) return null;
+            return (
+                <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] animate-fade-in w-[90%] max-w-sm">
+                    <div className="bg-gray-800 border border-gray-700 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3">
+                         {type === 'success' ? (
+                             <Icon name="check-circle-2" size={20} className="text-green-500" />
+                         ) : (
+                             <Icon name="info" size={20} className="text-blue-500" />
+                         )}
+                         <div className="flex-1 text-sm font-medium">{message}</div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- Main App ---
+
+        function App() {
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [viewMode, setViewMode] = useState('main'); 
+            const [selectedClient, setSelectedClient] = useState(null);
+            
+            const [printing, setPrinting] = useState(false);
+            const [sendingMsg, setSendingMsg] = useState(false);
+            
+            // Toast state
+            const [toast, setToast] = useState({ message: null, type: 'info' });
+
+            const [shipmentPrices, setShipmentPrices] = useState({});
+            const [printStage, setPrintStage] = useState('idle');
+
+            // CRITICAL: Re-run createIcons on every render to ensure SVG injection
+            useEffect(() => {
+                if (window.lucide) {
+                    window.lucide.createIcons();
+                }
+            });
+
+            // Helper to show notification
+            const showNotification = (msg, type = 'success') => {
+                // ИСПРАВЛЕНИЕ 5: Проверка на Telegram WebApp
+                if (window.Telegram?.WebApp?.showPopup) {
+                    window.Telegram.WebApp.showPopup({
+                        title: type === 'success' ? 'Готово' : 'Информация',
+                        message: msg,
+                        buttons: [{ type: 'ok' }]
+                    });
+                } else {
+                    // Fallback to custom toast
+                    setToast({ message: msg, type });
+                    setTimeout(() => setToast({ message: null, type: 'info' }), 3000);
+                }
+            };
+
+            useEffect(() => {
+                if (viewMode === 'shipments_tomorrow') {
+                    const initialPrices = {};
+                    MOCK_DATA.shipments.tomorrow.details.forEach((item, idx) => {
+                        initialPrices[idx] = item.defaultPrice;
+                    });
+                    setShipmentPrices(initialPrices);
+                }
+            }, [viewMode]);
+
+            const handlePriceChange = (idx, value) => {
+                setShipmentPrices(prev => ({ ...prev, [idx]: value }));
+            };
+
+            const handleComplexPrint = () => {
+                if (printStage !== 'idle') return;
+                setPrintStage('sending');
+                setTimeout(() => setPrintStage('printing'), 2000);
+                setTimeout(() => setPrintStage('sent'), 4500);
+                setTimeout(() => {
+                    setPrintStage('idle');
+                    showNotification("Накладные успешно отправлены в чат!");
+                }, 6500);
+            };
+
+            const handlePrint = () => {
+                setPrinting(true);
+                setTimeout(() => {
+                    setPrinting(false);
+                    showNotification("Задача отправлена в 1С!");
+                }, 1500);
+            };
+
+            const handleConfirmDemand = () => {
+                setSendingMsg(true);
+                setTimeout(() => {
+                    setSendingMsg(false);
+                    showNotification("Сообщения отправлены клиентам в Telegram!");
+                }, 1500);
+            };
+
+            const openForecastDetails = () => setViewMode('forecast');
+            const openClientDetails = (client) => {
+                setSelectedClient(client);
+                setViewMode('client_detail');
+            };
+            const openTomorrowShipments = () => setViewMode('shipments_tomorrow');
+            
+            const goBack = () => {
+                setViewMode('main');
+                setSelectedClient(null);
+                setPrintStage('idle');
+            };
+
+            // Renders
+
+            const renderForecastDetails = () => (
+                <div className="animate-slide-in pb-20">
+                    <Header title="Прогноз закупки" subtitle="Детализация на следующую неделю" onBack={goBack} />
+                    <div className="bg-indigo-900/20 border border-indigo-500/30 p-4 rounded-2xl mb-6 text-center">
+                        <span className="text-indigo-300 text-xs font-bold uppercase">Общий объем</span>
+                        <div className="text-4xl font-bold text-white mt-1">{MOCK_DATA.summary.forecastDemand.toLocaleString()}</div>
+                        <div className="text-indigo-200/60 text-xs mt-1">яиц нужно закупить</div>
+                    </div>
+                    <div className="space-y-3">
+                        {MOCK_DATA.forecastDetails.map((item, idx) => (
+                            <div key={idx} className="bg-gray-800 p-4 rounded-xl flex justify-between items-center border border-gray-700">
+                                <div>
+                                    <div className="font-bold text-white text-sm">{item.name}</div>
+                                    <div className="text-[10px] text-gray-400 mt-1">{item.reason}</div>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-white font-mono font-bold">{item.amount}</div>
+                                    <div className={`text-[10px] ${item.change.startsWith('+') ? 'text-green-400' : item.change.startsWith('-') ? 'text-red-400' : 'text-gray-500'}`}>
+                                        {item.change}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+
+            const renderTomorrowShipments = () => (
+                <div className="animate-slide-in pb-24">
+                    <Header title="План на завтра" subtitle="Установка цен и печать" onBack={goBack} />
+                    <div className="bg-blue-900/20 border border-blue-500/30 p-4 rounded-2xl mb-6 flex justify-between items-center">
+                        <div>
+                            <span className="text-blue-300 text-xs font-bold uppercase">Всего к отгрузке</span>
+                            <div className="text-3xl font-bold text-white mt-1">{MOCK_DATA.shipments.tomorrow.totalAmount.toLocaleString()} <span className="text-sm font-normal text-gray-400">шт</span></div>
+                        </div>
+                        <div className="text-right">
+                            <span className="text-blue-300 text-xs font-bold uppercase">Клиентов</span>
+                            <div className="text-2xl font-bold text-white mt-1">{MOCK_DATA.shipments.tomorrow.shipmentsCount}</div>
+                        </div>
+                    </div>
+                    <div className="space-y-3 mb-24">
+                        {MOCK_DATA.shipments.tomorrow.details.map((item, idx) => (
+                            <div key={idx} className="bg-gray-800 p-4 rounded-xl border border-gray-700">
+                                <div className="flex justify-between items-start mb-3">
+                                    <div>
+                                        <div className="font-bold text-white text-sm">{item.name}</div>
+                                        <div className="flex items-center gap-1 text-gray-400 text-[10px] mt-1">
+                                            <Icon name="map-pin" size={10} /> {item.address}
+                                        </div>
+                                    </div>
+                                    <div className="bg-gray-700 px-2 py-1 rounded text-white font-mono font-bold text-xs">{item.amount} шт</div>
+                                </div>
+                                <div className="flex items-center gap-2 bg-black/20 p-2 rounded-lg border border-gray-700/50">
+                                    <div className="text-gray-500 text-[10px] uppercase font-bold shrink-0">Цена за шт:</div>
+                                    <input 
+                                        type="number" step="0.1" value={shipmentPrices[idx] || ''}
+                                        onChange={(e) => handlePriceChange(idx, e.target.value)}
+                                        className="bg-transparent text-white font-mono font-bold text-sm outline-none w-full text-right focus:text-blue-400 transition-colors"
+                                    />
+                                    <div className="text-gray-500 text-xs">₽</div>
+                                    <Icon name="edit-2" size={12} className="text-gray-600" />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-[#0F1115] via-[#0F1115] to-transparent z-50">
+                        <div className="max-w-md mx-auto">
+                            <button 
+                                onClick={handleComplexPrint} disabled={printStage !== 'idle'}
+                                className={`w-full py-4 rounded-xl flex items-center justify-center gap-3 font-bold text-sm transition-all shadow-xl
+                                    ${printStage === 'sent' ? 'bg-green-600 text-white' : 
+                                    printStage !== 'idle' ? 'bg-gray-700 text-gray-300' : 
+                                    'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-900/40 active:scale-95'}
+                                `}
+                            >
+                                {printStage === 'idle' && <><Icon name="printer" size={18} /> Распечатать накладные</>}
+                                {printStage === 'sending' && <><Icon name="loader-2" size={18} className="animate-spin" /> Отправляем в 1С...</>}
+                                {printStage === 'printing' && <><Icon name="file-text" size={18} className="animate-pulse" /> Формируем файлы...</>}
+                                {printStage === 'sent' && <><Icon name="check-circle-2" size={18} /> Отправили в чат!</>}
+                            </button>
+                            <p className="text-center text-[10px] text-gray-500 mt-2">Цены из полей выше попадут в накладные</p>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            const renderClientDetailView = () => {
+                if (!selectedClient) return null;
+                return (
+                    <div className="animate-slide-in pb-20">
+                        <Header title={selectedClient.name} subtitle="Карточка клиента" onBack={goBack} />
+                        <div className="grid grid-cols-2 gap-3 mb-6">
+                            <Card className="col-span-2 bg-gradient-to-r from-gray-800 to-gray-800 border-l-4 border-yellow-500">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-yellow-500/10 flex items-center justify-center text-yellow-500">
+                                        <Icon name="calendar" size={20} />
+                                    </div>
+                                    <div>
+                                        <div className="text-gray-400 text-[10px] font-bold uppercase">Сотрудничаем с</div>
+                                        <div className="text-white font-bold">{selectedClient.joinDate}</div>
+                                    </div>
+                                </div>
+                            </Card>
+                            <Card>
+                                <ValueDisplay label="Всего заказов" value={selectedClient.totalOrders} subValue={<span className="text-[10px] text-gray-500">за все время</span>} />
+                            </Card>
+                            <Card>
+                                <ValueDisplay label="Всего яиц" value={selectedClient.totalEggsAllTime} subValue={<span className="text-[10px] text-gray-500">куплено шт.</span>} />
+                            </Card>
+                            <Card className="col-span-2 bg-gray-800">
+                                <div className="flex justify-between items-center mb-2">
+                                    <span className="text-gray-400 text-[10px] font-bold uppercase">Финансы (Total)</span>
+                                    <Icon name="wallet" size={16} className="text-green-500" />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-700">
+                                    <div>
+                                        <div className="text-xs text-gray-500">Оборот</div>
+                                        <div className="text-white font-bold text-lg">{selectedClient.totalRevenueAllTime.toLocaleString()} ₽</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-xs text-gray-500">Чистая прибыль</div>
+                                        <div className="text-green-400 font-bold text-lg">+{selectedClient.totalProfitAllTime.toLocaleString()} ₽</div>
+                                    </div>
+                                </div>
+                            </Card>
+                        </div>
+                        <div className="flex gap-2">
+                            <button className="flex-1 bg-gray-800 border border-gray-600 text-white font-bold py-3 rounded-xl hover:bg-gray-700 active:scale-95 transition-all flex items-center justify-center gap-2">
+                                <Icon name="file-text" size={16} /> История
+                            </button>
+                            <button className="flex-1 bg-green-600/20 border border-green-500/50 text-green-400 font-bold py-3 rounded-xl hover:bg-green-600/30 active:scale-95 transition-all flex items-center justify-center gap-2">
+                                <Icon name="phone" size={16} /> Позвонить
+                            </button>
+                        </div>
+                    </div>
+                );
+            };
+
+            const renderDashboard = () => (
+                <div className="space-y-3 animate-fade-in pb-20">
+                    <div className="grid grid-cols-2 gap-3">
+                        <Card className="bg-gray-800 border-l-4 border-green-500">
+                            <ValueDisplay label="Чистая прибыль" value={MOCK_DATA.summary.netIncome} prefix="₽" subValue={<TrendIcon value={MOCK_DATA.trends.income} />} />
+                        </Card>
+                        <Card>
+                            <ValueDisplay label="Оборот (Мес)" value={MOCK_DATA.summary.revenue} prefix="₽" subValue={<TrendIcon value={MOCK_DATA.trends.revenue} />} />
+                        </Card>
+                    </div>
+                    <Card className="bg-gray-800 relative overflow-hidden">
+                        <div className="relative z-10 flex justify-between items-center">
+                            <div>
+                                <span className="text-gray-400 text-[10px] font-bold uppercase tracking-wider">Продано яиц (Месяц)</span>
+                                <div className="text-3xl font-bold text-white mt-1">
+                                    {MOCK_DATA.summary.soldThisMonth.toLocaleString()} <span className="text-sm text-gray-500 font-normal">шт</span>
+                                </div>
+                            </div>
+                            <div className="bg-yellow-500/10 p-2 rounded-lg">
+                                <Icon name="layers" size={24} className="text-yellow-500" />
+                            </div>
+                        </div>
+                        <div className="mt-2 flex items-center gap-2">
+                            <TrendIcon value={MOCK_DATA.trends.sold} />
+                            <span className="text-[10px] text-gray-500">к прошлому месяцу</span>
+                        </div>
+                    </Card>
+                    <Card onClick={openForecastDetails} className="col-span-2 bg-gradient-to-br from-indigo-900 to-gray-900 border border-indigo-500/30 active:scale-[0.98] cursor-pointer hover:border-indigo-400/50 transition-all group">
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <span className="text-indigo-300 text-xs font-bold uppercase flex items-center gap-1 group-hover:text-indigo-200">
+                                    <Icon name="brain" size={12} /> Прогноз закупки (Неделя) <Icon name="arrow-right" size={12} />
+                                </span>
+                                <h3 className="text-4xl font-bold text-white mt-2">{MOCK_DATA.summary.forecastDemand.toLocaleString()} шт.</h3>
+                            </div>
+                            <div className="text-right bg-indigo-500/20 px-2 py-1 rounded">
+                                <div className="text-[10px] text-indigo-200 uppercase">Спрос</div>
+                                <div className="text-green-400 font-bold">+15%</div>
+                            </div>
+                        </div>
+                        <div className="mt-3 bg-black/20 p-2 rounded-lg border border-white/5 flex gap-2 items-start">
+                            <Icon name="info" size={14} className="text-indigo-300 shrink-0 mt-0.5" />
+                            <p className="text-xs text-indigo-100/80 leading-relaxed">{MOCK_DATA.summary.forecastExplanation}</p>
+                        </div>
+                        <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-2 gap-4">
+                            <div>
+                                <div className="text-gray-400 text-[10px] uppercase">Себестоимость</div>
+                                <div className="text-white font-mono font-bold">{MOCK_DATA.summary.avgCost} ₽</div>
+                            </div>
+                            <div>
+                                <div className="text-gray-400 text-[10px] uppercase">Цена продажи</div>
+                                <div className="text-white font-mono font-bold">{MOCK_DATA.summary.avgPrice} ₽</div>
+                            </div>
+                        </div>
+                    </Card>
+                    <div className="grid grid-cols-2 gap-3">
+                        <Card onClick={() => setActiveTab('clients')}>
+                            <div className="flex justify-between items-start">
+                                <Icon name="users" size={20} className="text-blue-400" />
+                                <Icon name="arrow-right" size={16} className="text-gray-600" />
+                            </div>
+                            <div className="mt-3">
+                                <div className="text-2xl font-bold text-white">{MOCK_DATA.clients.active}</div>
+                                <div className="text-xs text-gray-400">Активные клиенты</div>
+                            </div>
+                            <div className="mt-2 text-xs flex items-center gap-1 text-red-400 bg-red-500/10 px-2 py-1 rounded w-fit">
+                                <Icon name="alert-circle" size={10} /> {MOCK_DATA.clients.churned} риск оттока
+                            </div>
+                        </Card>
+                        <Card className="relative overflow-hidden">
+                            <div className="relative z-10">
+                                <Icon name="package" size={20} className="text-orange-400" />
+                                <div className="mt-3">
+                                    <div className="text-2xl font-bold text-white">{MOCK_DATA.summary.eggBalance}</div>
+                                    <div className="text-xs text-gray-400">Остаток на складе</div>
+                                </div>
+                            </div>
+                            <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-700">
+                                <div className="h-full bg-orange-500 w-[70%]"></div>
+                            </div>
+                        </Card>
+                    </div>
+                    <div className="space-y-2 mt-2">
+                        <h3 className="text-xs font-bold text-gray-500 uppercase ml-1">AI Рекомендации</h3>
+                        {MOCK_DATA.aiRecommendations.map((rec, i) => (
+                            <div key={i} className="bg-gray-800/50 border border-gray-700 p-3 rounded-xl flex gap-3 items-start">
+                                <div className="bg-purple-500/20 p-1.5 rounded-lg shrink-0">
+                                    <Icon name="brain" size={14} className="text-purple-400" />
+                                </div>
+                                <p className="text-xs text-gray-300 leading-normal">{rec}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+
+            const renderOperations = () => (
+                <div className="animate-slide-in space-y-4 pb-20">
+                    <SectionTitle title="Сегодня на отгрузку" iconName="truck" />
+                    <div className="space-y-2">
+                        {MOCK_DATA.shipments.today.map((item) => (
+                            <div key={item.id} className="bg-gray-800 p-4 rounded-xl flex justify-between items-center border border-gray-700 shadow-sm">
+                                <div>
+                                    <div className="font-bold text-white text-sm">{item.name}</div>
+                                    <div className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                                        <Icon name="package" size={12} /> {item.amount} яиц
+                                    </div>
+                                </div>
+                                <div className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${item.status === 'shipped' ? 'bg-green-500/20 text-green-400' : item.status === 'ready' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-gray-700 text-gray-400'}`}>
+                                    {item.status === 'shipped' ? 'Отгружено' : item.status === 'ready' ? 'Готово' : 'В сборке'}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    <div onClick={openTomorrowShipments} className="p-5 bg-gray-800 rounded-xl mt-6 border border-gray-700 active:scale-[0.98] cursor-pointer hover:border-gray-500 transition-all group">
+                        <div className="flex justify-between items-center mb-4">
+                            <div>
+                                <span className="text-gray-400 text-xs font-bold uppercase group-hover:text-gray-200 flex items-center gap-1">
+                                    План на завтра <Icon name="arrow-right" size={12} />
+                                </span>
+                                <div className="text-white font-bold text-xl mt-1">{MOCK_DATA.shipments.tomorrow.totalAmount.toLocaleString()} шт.</div>
+                            </div>
+                            <div className="text-right">
+                                <span className="text-gray-400 text-xs font-bold uppercase">Отгрузок</span>
+                                <div className="text-white font-bold text-xl mt-1">{MOCK_DATA.shipments.tomorrow.shipmentsCount}</div>
+                            </div>
+                        </div>
+                        <div className="w-full bg-gray-700 h-2 rounded-full overflow-hidden mb-4">
+                            <div className="bg-blue-500 h-full w-[45%]"></div>
+                        </div>
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); handleConfirmDemand(); }}
+                            disabled={sendingMsg}
+                            className={`w-full py-3 rounded-lg flex items-center justify-center gap-2 font-bold text-sm transition-all
+                                ${sendingMsg ? 'bg-gray-700 text-gray-400' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-900/40 active:scale-95'}
+                            `}
+                        >
+                            {sendingMsg ? <Icon name="refresh-cw" size={16} className="animate-spin" /> : <Icon name="send" size={16} />}
+                            {sendingMsg ? 'Рассылка...' : 'Разослать подтверждение спроса'}
+                        </button>
+                        <p className="text-center text-[10px] text-gray-500 mt-2">Клиенты получат сообщение в Telegram для подтверждения заказа</p>
+                    </div>
+                    <button 
+                        onClick={handlePrint} disabled={printing}
+                        className={`w-full py-4 rounded-xl mt-2 flex items-center justify-center gap-2 font-bold text-white transition-all border border-white/5
+                            ${printing ? 'bg-gray-800' : 'bg-gray-700 hover:bg-gray-600 active:scale-95'}
+                        `}
+                    >
+                        {printing ? <Icon name="refresh-cw" className="animate-spin" /> : <Icon name="printer" />}
+                        {printing ? 'Печать...' : 'Распечатать накладные'}
+                    </button>
+                </div>
+            );
+
+            const renderClients = () => (
+                <div className="animate-slide-in space-y-4 pb-20">
+                    <div className="grid grid-cols-2 gap-3">
+                        <Card>
+                            <ValueDisplay label="Retention Rate" value={MOCK_DATA.clients.retention} suffix="%" />
+                        </Card>
+                        <Card>
+                            <ValueDisplay label="Топ Клиентов" value={MOCK_DATA.clients.top.length} />
+                        </Card>
+                    </div>
+                    {MOCK_DATA.clients.atRisk.length > 0 && (
+                        <>
+                            <SectionTitle title="В зоне риска" iconName="alert-circle" colorClass="text-red-500" />
+                            <div className="space-y-2">
+                                {MOCK_DATA.clients.atRisk.map((client, idx) => (
+                                    <div key={`risk-${idx}`} onClick={() => openClientDetails(client)} className="bg-gray-800/80 border border-red-500/30 p-4 rounded-xl relative overflow-hidden active:scale-95 transition-all cursor-pointer">
+                                        <div className="absolute top-0 right-0 p-2">
+                                            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                                        </div>
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div>
+                                                <div className="font-bold text-white text-sm">{client.name}</div>
+                                                <div className="text-[10px] text-red-300 font-bold mt-1">Не заказывал {client.lastOrderDays} дней</div>
+                                            </div>
+                                            <div className="bg-red-500/10 px-2 py-1 rounded text-red-400 text-[10px] font-bold uppercase tracking-wider">Отток</div>
+                                        </div>
+                                        <div className="bg-red-500/10 p-2 rounded-lg flex items-start gap-2 border border-red-500/20">
+                                            <Icon name="brain" size={14} className="text-red-400 mt-0.5 shrink-0" />
+                                            <p className="text-[11px] text-red-100 leading-tight">{client.recommendation}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </>
+                    )}
+                    <SectionTitle title="Топ клиентов" iconName="users" />
+                    <div className="space-y-2">
+                        {MOCK_DATA.clients.top.map((client, idx) => (
+                            <div key={idx} onClick={() => openClientDetails(client)} className="bg-gray-800 p-4 rounded-xl flex items-center justify-between border border-gray-700/50 cursor-pointer hover:bg-gray-700 active:scale-95 transition-all">
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-lg ${idx === 0 ? 'bg-yellow-500' : idx === 1 ? 'bg-gray-400' : idx === 2 ? 'bg-orange-700' : 'bg-gray-700'}`}>
+                                        #{idx + 1}
+                                    </div>
+                                    <div>
+                                        <div className="text-white font-bold text-sm flex items-center gap-1">
+                                            {client.name}
+                                            <Icon name="chevron-left" size={14} className="rotate-180 text-gray-600" />
+                                        </div>
+                                        <div className="flex gap-3 mt-1">
+                                            <div className="text-[10px] text-gray-400">
+                                                <span className="text-gray-500">Объем:</span> <span className="text-gray-200">{client.volume.toLocaleString()} ₽</span>
+                                            </div>
+                                            <div className="text-[10px] text-gray-400 border-l border-gray-600 pl-3">
+                                                <span className="text-gray-500">Яиц:</span> <span className="text-gray-200">{client.eggs.toLocaleString()}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <TrendIcon value={10} invert={false} /> {/* Hardcoded trend for list demo, ideally from data */}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+
+            return (
+                <div className="min-h-screen text-gray-100 font-sans selection:bg-yellow-500/30 pb- safe-area-bottom">
+                    <Toast message={toast.message} type={toast.type} />
+                    
+                    <div className="max-w-md mx-auto p-4">
+                        {viewMode === 'main' && <Header title="Яйцо Хорошее" subtitle="Панель управления" />}
+
+                        {viewMode === 'forecast' && renderForecastDetails()}
+                        {viewMode === 'client_detail' && renderClientDetailView()}
+                        {viewMode === 'shipments_tomorrow' && renderTomorrowShipments()}
+
+                        {viewMode === 'main' && (
+                            <>
+                                {activeTab === 'dashboard' && renderDashboard()}
+                                {activeTab === 'operations' && renderOperations()}
+                                {activeTab === 'clients' && renderClients()}
+                            </>
+                        )}
+
+                        {/* Bottom Navigation */}
+                        {viewMode === 'main' && (
+                            <div className="fixed bottom-0 left-0 right-0 bg-[#0F1115]/90 backdrop-blur-xl border-t border-gray-800 p-2 z-50 safe-area-bottom">
+                                <div className="max-w-md mx-auto grid grid-cols-3 gap-1">
+                                    <button onClick={() => setActiveTab('dashboard')} className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all duration-300 ${activeTab === 'dashboard' ? 'text-yellow-400 bg-yellow-400/10' : 'text-gray-500 hover:text-gray-300'}`}>
+                                        <Icon name="layers" size={20} />
+                                        <span className="text-[10px] mt-1 font-medium">Сводка</span>
+                                    </button>
+                                    <button onClick={() => setActiveTab('operations')} className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all duration-300 ${activeTab === 'operations' ? 'text-yellow-400 bg-yellow-400/10' : 'text-gray-500 hover:text-gray-300'}`}>
+                                        <Icon name="package" size={20} />
+                                        <span className="text-[10px] mt-1 font-medium">Операции</span>
+                                    </button>
+                                    <button onClick={() => setActiveTab('clients')} className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all duration-300 ${activeTab === 'clients' ? 'text-yellow-400 bg-yellow-400/10' : 'text-gray-500 hover:text-gray-300'}`}>
+                                        <Icon name="users" size={20} />
+                                        <span className="text-[10px] mt-1 font-medium">Клиенты</span>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
